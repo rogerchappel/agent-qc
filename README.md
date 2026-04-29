@@ -34,11 +34,38 @@ Machine-readable output:
 agent-qc github-pr-body --repo rogerchappel/agent-qc --pr 1 --json
 ```
 
+Scan a planned shell command without executing it:
+
+```sh
+echo 'gh pr create --body "## Summary\\n- Fix bug"' | agent-qc command-scan
+```
+
+Or use the `--command` flag:
+
+```sh
+agent-qc command-scan --command 'gh pr create --body "## Summary\\n- Fix bug"'
+```
+
+Safe commands pass through:
+
+```sh
+agent-qc command-scan --command 'ls -la'
+```
+
+Use JSON output for automation:
+
+```sh
+echo 'gh pr create --body "test\\nbody"' | agent-qc command-scan --json
+```
+
 ## Current gates
 
 - Fails literal `\n` sequences in GitHub markdown bodies.
 - Fails empty GitHub markdown bodies.
 - Provides a concrete fix message for the agent.
+- Scans planned shell commands via `command-scan` (does not execute).
+- Fails `gh pr create` or `gh pr edit` commands using unsafe `--body` with escaped newlines.
+- Recommends `--body-file` when unsafe patterns are detected.
 
 ## Next gates
 
