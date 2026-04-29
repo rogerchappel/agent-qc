@@ -16,6 +16,20 @@ pnpm install
 
 ## Use
 
+Run the one-command local handoff gate:
+
+```sh
+agent-qc ready
+```
+
+Use JSON output for automation:
+
+```sh
+agent-qc ready --json
+```
+
+`ready` currently runs the local deterministic readiness checks built into `agent-qc` and will call `atomcommit --json` when `atomcommit` is installed on `PATH`. Missing `atomcommit` is a warning for now, not a hard failure.
+
 Validate a local body before posting to GitHub:
 
 ```sh
@@ -60,6 +74,8 @@ echo 'gh pr create --body "test\\nbody"' | agent-qc command-scan --json
 
 ## Current gates
 
+- `ready` provides a single local handoff command for agents.
+- `ready` calls `atomcommit --json` when available and warns when it is missing.
 - Fails literal `\n` sequences in GitHub markdown bodies.
 - Fails empty GitHub markdown bodies.
 - Provides a concrete fix message for the agent.
