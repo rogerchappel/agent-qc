@@ -1,13 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateGithubBody, scanCommand, run, runReady } from '../src/index.js';
-import { spawnSync } from 'node:child_process';
+import { checkGitBranch, checkGitCommits, isConventionalCommit, validateGithubBody, scanCommand, run, runReady } from '../src/index.js';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, unlinkSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-test('passes normal markdown bodies', () => {
-  const result = validateGithubBody('## Summary\n- Updated docs\n\n## Verification\n- node --test\n');
+function tmpRepo() {
+  const repo = mkdtempSync(join(tmpdir(), 'agent-qc-repo-'));
+  execFileSync('git', ['init', '-b', 'main'], { cwd: repo, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.email', 'agent-qc@example.test'], { cwd: repo });
+  execFileSync('git', ['config', 'user.name', 'Agent QC'], { cwd: repo });
+  writeFileSync(join(repo, 'README.md'), '# tmp\n');
+  execFileSync('git', ['add', 'README.md'], { cwd: repo });
+  execFileSync('git', ['commit', '-m', 'chore: initial commit'], { cwd: repo, stdio: 'ignore' });
+  execFileSync('git', ['branch', 'origin/main'], { cwd: repo });
+  return repo;
+}
+
+test('passes reviewable markdown bodies', () => {
+  const body = '## Summary\n- Updated docs\n\n## Verification\n- node --test\n\n## Risk Level\n- Low\n\n## Rollback Plan\n- Revert commit\n';
+  const result = validateGithubBody(body, { requiredSections: ['Summary', 'Verification', 'Risk Level', 'Rollback Plan'] });
   assert.equal(result.ok, true);
   assert.deepEqual(result.failures, []);
 });
@@ -22,6 +35,13 @@ test('fails empty bodies', () => {
   const result = validateGithubBody('   ');
   assert.equal(result.ok, false);
   assert.equal(result.failures[0].code, 'empty-body');
+});
+
+test('fails bodies missing required sections', () => {
+  const result = validateGithubBody('## Summary\n- Updated docs\n', { requiredSections: ['Summary', 'Verification'] });
+  assert.equal(result.ok, false);
+  assert.equal(result.failures[0].code, 'missing-review-sections');
+  assert.match(result.failures[0].message, /Verification/);
 });
 
 test('command-scan passes safe commands', () => {
@@ -80,52 +100,140 @@ test('command-scan json output', () => {
   assert.equal(result, 1);
 });
 
-test('ready warns when atomcommit is missing', () => {
-  const result = spawnSync(process.execPath, ['src/index.js', 'ready', '--json'], {
-    cwd: new URL('..', import.meta.url).pathname,
-    encoding: 'utf8',
-    env: { ...process.env, PATH: mkdtempSync(join(tmpdir(), 'agent-qc-empty-path-')) },
-  });
+test('validates Conventional Commit subjects', () => {
+  assert.equal(isConventionalCommit('feat(git): add branch hygiene gate'), true);
+  assert.equal(isConventionalCommit('fix: repair parser'), true);
+  assert.equal(isConventionalCommit('update docs'), false);
+});
 
-  assert.equal(result.status, 0);
-  const parsed = JSON.parse(result.stdout);
-  assert.equal(parsed.ok, true);
-  assert.equal(parsed.warnings[0].code, 'atomcommit-unavailable');
-  assert.equal(parsed.checks[0].status, 'warn');
+test('git-branch passes on clean feature branch', () => {
+  const repo = tmpRepo();
+  try {
+    execFileSync('git', ['checkout', '-b', 'feat/clean'], { cwd: repo, stdio: 'ignore' });
+    const result = checkGitBranch({ repo, base: 'origin/main' });
+    assert.equal(result.ok, true);
+    assert.equal(result.checks[0].status, 'pass');
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('git-branch fails on main and dirty working tree', () => {
+  const repo = tmpRepo();
+  try {
+    writeFileSync(join(repo, 'dirty.txt'), 'dirty\n');
+    const result = checkGitBranch({ repo, base: 'origin/main' });
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.failures.map((failure) => failure.code), ['protected-branch', 'dirty-working-tree']);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('git-commits passes scoped Conventional Commit branch', () => {
+  const repo = tmpRepo();
+  try {
+    execFileSync('git', ['checkout', '-b', 'feat/commit-check'], { cwd: repo, stdio: 'ignore' });
+    writeFileSync(join(repo, 'feature.txt'), 'feature\n');
+    execFileSync('git', ['add', 'feature.txt'], { cwd: repo });
+    execFileSync('git', ['commit', '-m', 'feat: add feature file'], { cwd: repo, stdio: 'ignore' });
+    const result = checkGitCommits({ repo, base: 'origin/main', maxCount: 5 });
+    assert.equal(result.ok, true);
+    assert.equal(result.checks[0].message, '1 commit(s) ahead of origin/main');
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('git-commits fails zero ahead commits and bad subjects', () => {
+  const repo = tmpRepo();
+  try {
+    let result = checkGitCommits({ repo, base: 'origin/main', maxCount: 5 });
+    assert.equal(result.ok, false);
+    assert.equal(result.failures[0].code, 'no-commits-ahead');
+
+    execFileSync('git', ['checkout', '-b', 'bad/commit'], { cwd: repo, stdio: 'ignore' });
+    writeFileSync(join(repo, 'bad.txt'), 'bad\n');
+    execFileSync('git', ['add', 'bad.txt'], { cwd: repo });
+    execFileSync('git', ['commit', '-m', 'update stuff'], { cwd: repo, stdio: 'ignore' });
+    result = checkGitCommits({ repo, base: 'origin/main', maxCount: 5 });
+    assert.equal(result.ok, false);
+    assert.equal(result.failures[0].code, 'non-conventional-commits');
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('ready warns when atomcommit is missing', () => {
+  const repo = tmpRepo();
+  const noAtomcommitPath = '/opt/homebrew/bin:/usr/bin:/bin';
+  try {
+    execFileSync('git', ['checkout', '-b', 'feat/ready'], { cwd: repo, stdio: 'ignore' });
+    writeFileSync(join(repo, 'ready.txt'), 'ready\n');
+    execFileSync('git', ['add', 'ready.txt'], { cwd: repo });
+    execFileSync('git', ['commit', '-m', 'feat: add ready fixture'], { cwd: repo, stdio: 'ignore' });
+    const result = spawnSync(process.execPath, ['src/index.js', 'ready', '--repo', repo, '--json'], {
+      cwd: new URL('..', import.meta.url).pathname,
+      encoding: 'utf8',
+      env: { ...process.env, PATH: noAtomcommitPath },
+    });
+
+    assert.equal(result.status, 0);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.warnings[0].code, 'atomcommit-unavailable');
+    assert.equal(parsed.checks.at(-1).status, 'warn');
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 });
 
 test('ready passes through atomcommit summary when available', () => {
+  const repo = tmpRepo();
   const binDir = mkdtempSync(join(tmpdir(), 'agent-qc-bin-'));
   const atomcommitPath = join(binDir, 'atomcommit');
   writeFileSync(atomcommitPath, '#!/bin/sh\nprintf \'{"summary":{"filesChanged":2,"suggestedCommits":1},"commits":[]}\\n\'\n');
   chmodSync(atomcommitPath, 0o755);
 
-  const result = spawnSync(process.execPath, ['src/index.js', 'ready', '--json'], {
-    cwd: new URL('..', import.meta.url).pathname,
-    encoding: 'utf8',
-    env: { ...process.env, PATH: binDir },
-  });
+  try {
+    execFileSync('git', ['checkout', '-b', 'feat/ready'], { cwd: repo, stdio: 'ignore' });
+    writeFileSync(join(repo, 'ready.txt'), 'ready\n');
+    execFileSync('git', ['add', 'ready.txt'], { cwd: repo });
+    execFileSync('git', ['commit', '-m', 'feat: add ready fixture'], { cwd: repo, stdio: 'ignore' });
+    const result = spawnSync(process.execPath, ['src/index.js', 'ready', '--repo', repo, '--json'], {
+      cwd: new URL('..', import.meta.url).pathname,
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${binDir}:/opt/homebrew/bin:/usr/bin:/bin` },
+    });
 
-  rmSync(binDir, { recursive: true, force: true });
-  assert.equal(result.status, 0);
-  const parsed = JSON.parse(result.stdout);
-  assert.equal(parsed.ok, true);
-  assert.deepEqual(parsed.warnings, []);
-  assert.equal(parsed.checks[0].status, 'pass');
-  assert.deepEqual(parsed.checks[0].summary, { filesChanged: 2, suggestedCommits: 1 });
+    assert.equal(result.status, 0);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.ok, true);
+    assert.deepEqual(parsed.warnings, []);
+    assert.equal(parsed.checks.at(-1).status, 'pass');
+    assert.deepEqual(parsed.checks.at(-1).summary, { filesChanged: 2, suggestedCommits: 1 });
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+    rmSync(binDir, { recursive: true, force: true });
+  }
 });
 
 test('runReady returns warning state when atomcommit is missing', () => {
+  const repo = tmpRepo();
   const originalPath = process.env.PATH;
-  const emptyPath = mkdtempSync(join(tmpdir(), 'agent-qc-runready-'));
-  process.env.PATH = emptyPath;
+  const noAtomcommitPath = '/opt/homebrew/bin:/usr/bin:/bin';
+  process.env.PATH = noAtomcommitPath;
 
   try {
-    const result = runReady();
+    execFileSync('git', ['checkout', '-b', 'feat/runready'], { cwd: repo, stdio: 'ignore' });
+    writeFileSync(join(repo, 'ready.txt'), 'ready\n');
+    execFileSync('git', ['add', 'ready.txt'], { cwd: repo });
+    execFileSync('git', ['commit', '-m', 'feat: add ready fixture'], { cwd: repo, stdio: 'ignore' });
+    const result = runReady({ cwd: repo });
     assert.equal(result.ok, true);
     assert.equal(result.warnings[0].code, 'atomcommit-unavailable');
   } finally {
     process.env.PATH = originalPath;
-    rmSync(emptyPath, { recursive: true, force: true });
+    rmSync(repo, { recursive: true, force: true });
   }
 });

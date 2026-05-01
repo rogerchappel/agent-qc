@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 function createResult() {
   return {
@@ -11,7 +12,34 @@ function createResult() {
   };
 }
 
-export function validateGithubBody(body) {
+function normalizeHeading(value) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function bodyHasHeading(body, heading) {
+  const wanted = normalizeHeading(heading);
+  return body
+    .split(/\r?\n/)
+    .some((line) => {
+      const match = line.match(/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/);
+      return match ? normalizeHeading(match[1]) === wanted : false;
+    });
+}
+
+function templateRequiredSections(cwd = process.cwd()) {
+  const templatePath = join(cwd, '.github', 'pull_request_template.md');
+  const defaults = ['Summary', 'Verification'];
+  if (!existsSync(templatePath)) return defaults;
+
+  const template = readFileSync(templatePath, 'utf8');
+  const sections = [...defaults];
+  for (const optional of ['Risk Level', 'Rollback Plan']) {
+    if (bodyHasHeading(template, optional)) sections.push(optional);
+  }
+  return [...new Set(sections)];
+}
+
+export function validateGithubBody(body, { requiredSections = ['Summary', 'Verification'] } = {}) {
   const result = createResult();
 
   if (body.includes('\\n')) {
@@ -28,6 +56,15 @@ export function validateGithubBody(body) {
       message: 'Body is empty.',
       fix: 'Create a reviewable markdown body with summary, verification, risk, and rollback sections.',
     });
+  } else {
+    const missing = requiredSections.filter((section) => !bodyHasHeading(body, section));
+    if (missing.length > 0) {
+      result.failures.push({
+        code: 'missing-review-sections',
+        message: `Body is missing required review section(s): ${missing.join(', ')}.`,
+        fix: `Add markdown headings for: ${missing.map((section) => `## ${section}`).join(', ')}.`,
+      });
+    }
   }
 
   result.ok = result.failures.length === 0;
@@ -70,6 +107,12 @@ function printResult(result, json = false) {
     process.stderr.write('agent-qc fail\n');
   }
 
+  for (const check of result.checks ?? []) {
+    process.stdout.write(`- ${check.name}: ${check.status}`);
+    if (check.message) process.stdout.write(`: ${check.message}`);
+    process.stdout.write('\n');
+  }
+
   for (const warning of result.warnings ?? []) {
     process.stdout.write(`- ${warning.code}: ${warning.message}\n`);
     if (warning.fix) {
@@ -83,6 +126,156 @@ function printResult(result, json = false) {
       process.stderr.write(`  suggest: ${failure.suggestion}\n`);
     }
   }
+}
+
+function git(cwd, args) {
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+
+function gitOk(cwd, args) {
+  try {
+    git(cwd, args);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function checkGitBranch({ repo = process.cwd(), base = 'origin/main' } = {}) {
+  const result = createResult();
+  let branch = '';
+
+  try {
+    branch = git(repo, ['branch', '--show-current']);
+  } catch (error) {
+    result.failures.push({
+      code: 'git-branch-unavailable',
+      message: 'Unable to inspect the current git branch.',
+      fix: 'Run this command from inside a git repository with git available on PATH.',
+    });
+  }
+
+  if (!branch) {
+    result.failures.push({
+      code: 'detached-head',
+      message: 'Repository is in a detached HEAD state.',
+      fix: 'Check out a named feature branch before reporting done.',
+    });
+  } else if (branch === 'main' || branch === 'master') {
+    result.failures.push({
+      code: 'protected-branch',
+      message: `Current branch is ${branch}.`,
+      fix: 'Create and work from a feature branch, not main or master.',
+    });
+  }
+
+  try {
+    const status = git(repo, ['status', '--porcelain']);
+    if (status.length > 0) {
+      result.failures.push({
+        code: 'dirty-working-tree',
+        message: 'Working tree has uncommitted changes.',
+        fix: 'Commit, stash, or discard local changes before reporting done.',
+      });
+    }
+  } catch {
+    result.failures.push({
+      code: 'git-status-unavailable',
+      message: 'Unable to inspect working tree status.',
+      fix: 'Run git status locally and fix repository issues before retrying.',
+    });
+  }
+
+  if (gitOk(repo, ['rev-parse', '--verify', '--quiet', base])) {
+    const behind = Number(git(repo, ['rev-list', '--count', `HEAD..${base}`]));
+    if (behind > 0) {
+      result.failures.push({
+        code: 'branch-behind-base',
+        message: `Current branch is behind ${base} by ${behind} commit(s).`,
+        fix: `Update the branch with ${base} before reporting done.`,
+      });
+    }
+  } else {
+    result.warnings.push({
+      code: 'base-ref-unavailable',
+      message: `${base} is not available locally; skipped behind-base check without fetching.`,
+      fix: `Fetch or create ${base}, then rerun agent-qc git-branch.`,
+    });
+  }
+
+  result.checks.push({
+    name: 'git-branch',
+    status: result.failures.length > 0 ? 'fail' : result.warnings.length > 0 ? 'warn' : 'pass',
+    message: branch ? `branch=${branch}, base=${base}` : `base=${base}`,
+  });
+  result.ok = result.failures.length === 0;
+  return result;
+}
+
+export function isConventionalCommit(subject) {
+  return /^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([^)]+\))?!?: .+/.test(subject)
+    || /^Revert ".+"/.test(subject);
+}
+
+export function checkGitCommits({ repo = process.cwd(), base = 'origin/main', maxCount = 5 } = {}) {
+  const result = createResult();
+  if (!gitOk(repo, ['rev-parse', '--verify', '--quiet', base])) {
+    result.failures.push({
+      code: 'base-ref-unavailable',
+      message: `${base} cannot be resolved locally.`,
+      fix: `Fetch or choose a valid base branch, then rerun agent-qc git-commits --base ${base}.`,
+    });
+    result.ok = false;
+    return result;
+  }
+
+  const subjects = git(repo, ['log', '--format=%s', `${base}..HEAD`])
+    .split('\n')
+    .filter(Boolean);
+
+  if (subjects.length === 0) {
+    result.failures.push({
+      code: 'no-commits-ahead',
+      message: `HEAD has no commits ahead of ${base}.`,
+      fix: 'Commit scoped changes before opening or updating a PR.',
+    });
+  }
+
+  if (subjects.length > Number(maxCount)) {
+    result.failures.push({
+      code: 'too-many-commits',
+      message: `Branch has ${subjects.length} commits ahead of ${base}; maximum is ${maxCount}.`,
+      fix: 'Split into smaller PRs or squash fixup commits before requesting review.',
+    });
+  }
+
+  const invalidSubjects = subjects.filter((subject) => !isConventionalCommit(subject));
+  if (invalidSubjects.length > 0) {
+    result.failures.push({
+      code: 'non-conventional-commits',
+      message: `Non-Conventional Commit subject(s): ${invalidSubjects.join('; ')}`,
+      fix: 'Use Conventional Commit subjects such as feat(scope): message or fix: message.',
+    });
+  }
+
+  result.checks.push({
+    name: 'git-commits',
+    status: result.failures.length > 0 ? 'fail' : 'pass',
+    message: `${subjects.length} commit(s) ahead of ${base}`,
+    subjects,
+  });
+  result.ok = result.failures.length === 0;
+  return result;
+}
+
+function mergeResult(target, source) {
+  target.failures.push(...(source.failures ?? []));
+  target.warnings.push(...(source.warnings ?? []));
+  target.checks.push(...(source.checks ?? []));
 }
 
 function githubPrBody({ repo, pr }) {
@@ -101,8 +294,7 @@ export function scanCommand(input) {
 
   if (input.includes('gh pr create') || input.includes('gh pr edit')) {
     const hasUnsafeBody = input.includes('--body "') && input.includes('\\n');
-    const hasMultilineString = /--body\s+["']((?:[^"']|\n)+)["']/
-      .test(input) && (input.match(/--body/g) || []).length > 0;
+    const hasMultilineString = /--body\s+["']((?:[^"']|\n)+)["']/.test(input) && (input.match(/--body/g) || []).length > 0;
 
     if (hasUnsafeBody || hasMultilineString) {
       result.failures.push({
@@ -120,8 +312,13 @@ export function scanCommand(input) {
   return result;
 }
 
-export function runReady({ cwd = process.cwd() } = {}) {
+export function runReady({ cwd = process.cwd(), base = 'origin/main', maxCount = 5 } = {}) {
   const result = createResult();
+
+  mergeResult(result, checkGitBranch({ repo: cwd, base }));
+  if (gitOk(cwd, ['rev-parse', '--verify', '--quiet', base])) {
+    mergeResult(result, checkGitCommits({ repo: cwd, base, maxCount }));
+  }
 
   try {
     const output = execFileSync('atomcommit', ['--json'], {
@@ -168,7 +365,7 @@ export function runReady({ cwd = process.cwd() } = {}) {
 }
 
 function usage() {
-  return `agent-qc\n\nUsage:\n  agent-qc ready [--json]\n  agent-qc github-pr-body --repo owner/name --pr 123 [--json]\n  agent-qc file-body --path /tmp/body.md [--json]\n  agent-qc command-scan [--command "cmd"] [--json]\n\nQuality gates:\n  ready           Run the local readiness gate. Calls atomcommit when it is available on PATH.\n  github-pr-body  Fetch a PR body with gh and fail on non-reviewable markdown issues.\n  file-body       Validate a local markdown body before posting it to GitHub.\n  command-scan    Scan a planned shell command (from stdin or --command) for unsafe patterns.\n                  Does NOT execute the command.\n`;
+  return `agent-qc\n\nUsage:\n  agent-qc ready [--repo .] [--base origin/main] [--max-count 5] [--json]\n  agent-qc git-branch [--repo .] [--base origin/main] [--json]\n  agent-qc git-commits [--repo .] [--base origin/main] [--max-count 5] [--json]\n  agent-qc github-pr-body --repo owner/name --pr 123 [--json]\n  agent-qc file-body --path /tmp/body.md [--json]\n  agent-qc command-scan [--command "cmd"] [--json]\n\nQuality gates:\n  ready           Run the local readiness gate. Does not fetch or mutate git state.\n  git-branch      Check branch name, cleanliness, and behind-base state using local git refs.\n  git-commits     Check commits ahead of a base ref for count and Conventional Commit subjects.\n  github-pr-body  Fetch a PR body with gh and fail on non-reviewable markdown issues.\n  file-body       Validate a local markdown body before posting it to GitHub.\n  command-scan    Scan a planned shell command (from stdin or --command) for unsafe patterns.\n                  Does NOT execute the command.\n`;
 }
 
 export function run(argv = process.argv.slice(2)) {
@@ -181,14 +378,26 @@ export function run(argv = process.argv.slice(2)) {
     }
 
     if (command === 'ready') {
-      const result = runReady();
+      const result = runReady({ cwd: flags.repo || process.cwd(), base: flags.base || 'origin/main', maxCount: flags['max-count'] || 5 });
+      printResult(result, Boolean(flags.json));
+      return result.ok ? 0 : 1;
+    }
+
+    if (command === 'git-branch') {
+      const result = checkGitBranch({ repo: flags.repo || process.cwd(), base: flags.base || 'origin/main' });
+      printResult(result, Boolean(flags.json));
+      return result.ok ? 0 : 1;
+    }
+
+    if (command === 'git-commits') {
+      const result = checkGitCommits({ repo: flags.repo || process.cwd(), base: flags.base || 'origin/main', maxCount: flags['max-count'] || 5 });
       printResult(result, Boolean(flags.json));
       return result.ok ? 0 : 1;
     }
 
     if (command === 'github-pr-body') {
       const body = githubPrBody({ repo: flags.repo, pr: flags.pr });
-      const result = validateGithubBody(body);
+      const result = validateGithubBody(body, { requiredSections: templateRequiredSections(process.cwd()) });
       printResult(result, Boolean(flags.json));
       return result.ok ? 0 : 1;
     }
@@ -196,7 +405,7 @@ export function run(argv = process.argv.slice(2)) {
     if (command === 'file-body') {
       if (!flags.path) throw new Error('file-body requires --path /tmp/body.md');
       const body = readFileSync(flags.path, 'utf8');
-      const result = validateGithubBody(body);
+      const result = validateGithubBody(body, { requiredSections: templateRequiredSections(process.cwd()) });
       printResult(result, Boolean(flags.json));
       return result.ok ? 0 : 1;
     }
