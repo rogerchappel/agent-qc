@@ -95,6 +95,16 @@ test('command-scan via --command flag', () => {
   assert.equal(result, 0);
 });
 
+test('prints package version', () => {
+  const result = spawnSync(process.execPath, ['src/index.js', '--version'], {
+    encoding: 'utf8',
+    cwd: new URL('..', import.meta.url).pathname,
+  });
+
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout.trim(), '0.1.0');
+});
+
 test('command-scan json output', () => {
   const result = run(['command-scan', '--command', 'gh pr create --body "a\\nb"', '--json']);
   assert.equal(result, 1);

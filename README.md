@@ -14,12 +14,24 @@ Early V0.1 dogfood build.
 pnpm install
 ```
 
+After publication, install the CLI with npm:
+
+```sh
+npm install -g agent-qc
+```
+
 ## Use
 
 Run the one-command local handoff gate:
 
 ```sh
 agent-qc ready
+```
+
+Check the installed CLI version:
+
+```sh
+agent-qc --version
 ```
 
 Use JSON output for automation:
@@ -107,6 +119,8 @@ echo 'gh pr create --body "test\\nbody"' | agent-qc command-scan --json
 ```sh
 pnpm test
 pnpm check
+npm run package:smoke
+npm run release:check
 bash scripts/validate.sh
 ```
 
