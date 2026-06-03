@@ -3,6 +3,11 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+function packageVersion() {
+  const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  return packageJson.version;
+}
+
 function createResult() {
   return {
     ok: true,
@@ -365,7 +370,7 @@ export function runReady({ cwd = process.cwd(), base = 'origin/main', maxCount =
 }
 
 function usage() {
-  return `agent-qc\n\nUsage:\n  agent-qc ready [--repo .] [--base origin/main] [--max-count 5] [--json]\n  agent-qc git-branch [--repo .] [--base origin/main] [--json]\n  agent-qc git-commits [--repo .] [--base origin/main] [--max-count 5] [--json]\n  agent-qc github-pr-body --repo owner/name --pr 123 [--json]\n  agent-qc file-body --path /tmp/body.md [--json]\n  agent-qc command-scan [--command "cmd"] [--json]\n\nQuality gates:\n  ready           Run the local readiness gate. Does not fetch or mutate git state.\n  git-branch      Check branch name, cleanliness, and behind-base state using local git refs.\n  git-commits     Check commits ahead of a base ref for count and Conventional Commit subjects.\n  github-pr-body  Fetch a PR body with gh and fail on non-reviewable markdown issues.\n  file-body       Validate a local markdown body before posting it to GitHub.\n  command-scan    Scan a planned shell command (from stdin or --command) for unsafe patterns.\n                  Does NOT execute the command.\n`;
+  return `agent-qc\n\nUsage:\n  agent-qc --version\n  agent-qc ready [--repo .] [--base origin/main] [--max-count 5] [--json]\n  agent-qc git-branch [--repo .] [--base origin/main] [--json]\n  agent-qc git-commits [--repo .] [--base origin/main] [--max-count 5] [--json]\n  agent-qc github-pr-body --repo owner/name --pr 123 [--json]\n  agent-qc file-body --path /tmp/body.md [--json]\n  agent-qc command-scan [--command "cmd"] [--json]\n\nQuality gates:\n  ready           Run the local readiness gate. Does not fetch or mutate git state.\n  git-branch      Check branch name, cleanliness, and behind-base state using local git refs.\n  git-commits     Check commits ahead of a base ref for count and Conventional Commit subjects.\n  github-pr-body  Fetch a PR body with gh and fail on non-reviewable markdown issues.\n  file-body       Validate a local markdown body before posting it to GitHub.\n  command-scan    Scan a planned shell command (from stdin or --command) for unsafe patterns.\n                  Does NOT execute the command.\n`;
 }
 
 export function run(argv = process.argv.slice(2)) {
@@ -374,6 +379,11 @@ export function run(argv = process.argv.slice(2)) {
   try {
     if (!command || command === 'help' || command === '--help' || command === '-h') {
       process.stdout.write(usage());
+      return 0;
+    }
+
+    if (command === '--version' || command === '-v' || command === 'version') {
+      process.stdout.write(`${packageVersion()}\n`);
       return 0;
     }
 
