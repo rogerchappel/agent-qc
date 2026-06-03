@@ -2,9 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateGithubBody, scanCommand, run, runReady } from '../src/index.js';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, unlinkSync, chmodSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, unlinkSync, chmodSync, readFileSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkgRoot = join(__dirname, '..');
 
 test('passes normal markdown bodies', () => {
   const result = validateGithubBody('## Summary\n- Updated docs\n\n## Verification\n- node --test\n');
@@ -128,4 +132,10 @@ test('runReady returns warning state when atomcommit is missing', () => {
     process.env.PATH = originalPath;
     rmSync(emptyPath, { recursive: true, force: true });
   }
+});
+
+test('package.json smoke and release scripts exist', () => {
+  const pkg = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8'));
+  assert.ok(pkg.scripts['package:smoke'], 'package:smoke should be defined');
+  assert.ok(pkg.scripts['release:check'], 'release:check should be defined');
 });
