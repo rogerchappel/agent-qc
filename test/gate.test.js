@@ -5,7 +5,6 @@ import { existsSync } from 'node:fs';
 
 describe('agent-quality gate', () => {
   it('should handle missing fixture gracefully', () => {
-    const { execSync } = require('child_process');
     try {
       execSync('node src/index.js ready /nonexistent/path', { encoding: 'utf8', stdio: 'pipe' });
     } catch (e) {
