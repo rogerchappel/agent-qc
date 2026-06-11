@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 failed=0
@@ -43,6 +43,31 @@ printf '\nChecking agent-qc required directories...\n'
 
 check_dir ".github"
 check_dir "docs"
+
+printf '\nRunning local package checks...\n'
+if pnpm test; then
+  pass "pnpm test"
+else
+  fail "pnpm test"
+fi
+
+if pnpm check; then
+  pass "pnpm check"
+else
+  fail "pnpm check"
+fi
+
+printf '\nRunning local readiness gate...\n'
+current_branch="$(git branch --show-current 2>/dev/null || true)"
+if [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ] || [ -z "$current_branch" ]; then
+  printf 'SKIP: agent-qc ready requires a named feature branch (current: %s)\n' "${current_branch:-detached}"
+else
+  if node src/index.js ready --repo . --base origin/main --json; then
+    pass "agent-qc ready"
+  else
+    fail "agent-qc ready"
+  fi
+fi
 
 if [ "$failed" -ne 0 ]; then
   printf '\nValidation failed.\n' >&2
