@@ -96,6 +96,8 @@ echo 'gh pr create --body "test\\nbody"' | agent-qc command-scan --json
 ```sh
 pnpm test
 pnpm check
+pnpm package:smoke
+pnpm release:check
 ```
 
 ## License
