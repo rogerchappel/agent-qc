@@ -16,7 +16,9 @@
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/index.js"
+    "check": "node --check src/index.js",
+    "package:smoke": "npm pack --dry-run",
+    "release:check": "npm test && npm run check && npm run package:smoke"
   },
   "keywords": [
     "agents",
@@ -25,5 +27,13 @@
     "cli"
   ],
   "author": "Roger Chappel",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rogerchappel/agent-qc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rogerchappel/agent-qc/issues"
+  },
+  "homepage": "https://github.com/rogerchappel/agent-qc#readme"
 }
