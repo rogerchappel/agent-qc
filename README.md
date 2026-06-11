@@ -117,8 +117,8 @@ echo 'gh pr create --body "test\\nbody"' | agent-qc command-scan --json
 ## Verify
 
 ```sh
-pnpm test
-pnpm check
+npm test
+npm run check
 npm run package:smoke
 npm run release:check
 bash scripts/validate.sh
