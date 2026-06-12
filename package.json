@@ -17,6 +17,10 @@
     "SECURITY.md",
     "CONTRIBUTING.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rogerchappel/agent-qc.git"
+  },
   "scripts": {
     "test": "node --test",
     "check": "node --check src/index.js",
