@@ -15,7 +15,8 @@
     "README.md",
     "LICENSE",
     "SECURITY.md",
-    "CONTRIBUTING.md"
+    "CONTRIBUTING.md",
+    "CHANGELOG.md"
   ],
   "repository": {
     "type": "git",
@@ -35,10 +36,6 @@
   ],
   "author": "Roger Chappel",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rogerchappel/agent-qc.git"
-  },
   "bugs": {
     "url": "https://github.com/rogerchappel/agent-qc/issues"
   },
