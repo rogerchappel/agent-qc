@@ -116,12 +116,19 @@ echo 'gh pr create --body "test\\nbody"' | agent-qc command-scan --json
 
 ## Verify
 
+Run the same release-readiness validation used by CI:
+
+```sh
+bash scripts/validate.sh
+```
+
+The validation script runs the package release check and only runs `agent-qc ready` when the current branch has commits ahead of `origin/main`.
+
 ```sh
 npm test
 npm run check
 npm run package:smoke
 npm run release:check
-bash scripts/validate.sh
 ```
 
 ## License
