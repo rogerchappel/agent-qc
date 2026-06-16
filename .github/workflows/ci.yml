@@ -31,8 +31,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run tests
-        run: pnpm test
-
-      - name: Syntax check
-        run: pnpm check
+      - name: Run release readiness validation
+        run: bash scripts/validate.sh
