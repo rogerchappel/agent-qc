@@ -66,6 +66,13 @@ Safe commands pass through:
 agent-qc command-scan --command 'ls -la'
 ```
 
+Check the installed CLI surface before release:
+
+```sh
+agent-qc --help
+agent-qc --version
+```
+
 Use JSON output for automation:
 
 ```sh
@@ -96,6 +103,7 @@ echo 'gh pr create --body "test\\nbody"' | agent-qc command-scan --json
 ```sh
 pnpm test
 pnpm check
+pnpm release:check
 ```
 
 ## License

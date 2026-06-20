@@ -2,6 +2,8 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
+const VERSION = '0.1.0';
+
 function createResult() {
   return {
     ok: true,
@@ -168,7 +170,7 @@ export function runReady({ cwd = process.cwd() } = {}) {
 }
 
 function usage() {
-  return `agent-qc\n\nUsage:\n  agent-qc ready [--json]\n  agent-qc github-pr-body --repo owner/name --pr 123 [--json]\n  agent-qc file-body --path /tmp/body.md [--json]\n  agent-qc command-scan [--command "cmd"] [--json]\n\nQuality gates:\n  ready           Run the local readiness gate. Calls atomcommit when it is available on PATH.\n  github-pr-body  Fetch a PR body with gh and fail on non-reviewable markdown issues.\n  file-body       Validate a local markdown body before posting it to GitHub.\n  command-scan    Scan a planned shell command (from stdin or --command) for unsafe patterns.\n                  Does NOT execute the command.\n`;
+  return `agent-qc\n\nUsage:\n  agent-qc ready [--json]\n  agent-qc github-pr-body --repo owner/name --pr 123 [--json]\n  agent-qc file-body --path /tmp/body.md [--json]\n  agent-qc command-scan [--command "cmd"] [--json]\n  agent-qc --version\n\nQuality gates:\n  ready           Run the local readiness gate. Calls atomcommit when it is available on PATH.\n  github-pr-body  Fetch a PR body with gh and fail on non-reviewable markdown issues.\n  file-body       Validate a local markdown body before posting it to GitHub.\n  command-scan    Scan a planned shell command (from stdin or --command) for unsafe patterns.\n                  Does NOT execute the command.\n`;
 }
 
 export function run(argv = process.argv.slice(2)) {
@@ -177,6 +179,11 @@ export function run(argv = process.argv.slice(2)) {
   try {
     if (!command || command === 'help' || command === '--help' || command === '-h') {
       process.stdout.write(usage());
+      return 0;
+    }
+
+    if (command === '--version' || command === '-v') {
+      process.stdout.write(`${VERSION}\n`);
       return 0;
     }
 

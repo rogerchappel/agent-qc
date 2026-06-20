@@ -12,11 +12,20 @@
   },
   "files": [
     "src",
-    "README.md"
+    "docs",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md"
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/index.js"
+    "check": "node --check src/index.js",
+    "smoke": "node src/index.js --help && node src/index.js --version && node src/index.js command-scan --command 'ls -la'",
+    "package:smoke": "npm pack --dry-run",
+    "release:check": "npm run check && npm test && npm run smoke && npm run package:smoke"
   },
   "keywords": [
     "agents",
