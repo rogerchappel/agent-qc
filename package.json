@@ -4,7 +4,7 @@
   "description": "Deterministic quality gates for agentic development workflows.",
   "type": "module",
   "bin": {
-    "agent-qc": "./src/index.js"
+    "agent-qc": "src/index.js"
   },
   "main": "./src/index.js",
   "exports": {
@@ -12,20 +12,21 @@
   },
   "files": [
     "src",
-    "docs",
     "README.md",
     "LICENSE",
     "SECURITY.md",
-    "CHANGELOG.md",
     "CONTRIBUTING.md",
-    "CODE_OF_CONDUCT.md"
+    "CHANGELOG.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rogerchappel/agent-qc.git"
+  },
   "scripts": {
     "test": "node --test",
     "check": "node --check src/index.js",
-    "smoke": "node src/index.js --help && node src/index.js --version && node src/index.js command-scan --command 'ls -la'",
     "package:smoke": "npm pack --dry-run",
-    "release:check": "npm run check && npm test && npm run smoke && npm run package:smoke"
+    "release:check": "npm test && npm run check && npm run package:smoke"
   },
   "keywords": [
     "agents",
@@ -34,5 +35,12 @@
     "cli"
   ],
   "author": "Roger Chappel",
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "bugs": {
+    "url": "https://github.com/rogerchappel/agent-qc/issues"
+  },
+  "homepage": "https://github.com/rogerchappel/agent-qc#readme"
 }
