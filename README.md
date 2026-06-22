@@ -131,6 +131,9 @@ npm run package:smoke
 npm run release:check
 ```
 
+`npm run package:smoke` asserts that the packed tarball keeps the CLI runtime,
+license, changelog, contributing guide, and security policy expected by users.
+
 ## License
 
 MIT
