@@ -45,10 +45,10 @@ check_dir ".github"
 check_dir "docs"
 
 printf '\nRunning local package checks...\n'
-if pnpm release:check; then
-  pass "pnpm release:check"
+if npm run release:check; then
+  pass "npm run release:check"
 else
-  fail "pnpm release:check"
+  fail "npm run release:check"
 fi
 
 printf '\nRunning local readiness gate...\n'

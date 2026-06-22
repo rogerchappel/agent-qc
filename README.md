@@ -11,7 +11,8 @@ Early V0.1 dogfood build.
 ## Install
 
 ```sh
-pnpm install
+npm install
+npm run release:check
 ```
 
 After publication, install the CLI with npm:
@@ -127,9 +128,13 @@ The validation script runs the package release check and only runs `agent-qc rea
 ```sh
 npm test
 npm run check
+npm run smoke
 npm run package:smoke
 npm run release:check
 ```
+
+`npm run smoke` verifies CLI help/version output, local PR-body validation,
+safe command scanning, and unsafe inline GitHub body detection.
 
 `npm run package:smoke` asserts that the packed tarball keeps the CLI runtime,
 license, changelog, contributing guide, and security policy expected by users.

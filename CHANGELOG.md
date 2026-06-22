@@ -9,7 +9,9 @@ format and uses semantic versioning when versioned releases are published.
 
 ### Added
 
-- Initial project setup.
+- Release-candidate package metadata and npm pack assertions.
+- CLI smoke verification for help, version, body validation, and command scanning.
+- README release-check commands that match CI.
 
 ## Release Links
 

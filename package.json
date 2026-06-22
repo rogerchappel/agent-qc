@@ -25,8 +25,9 @@
   "scripts": {
     "test": "node --test",
     "check": "node --check src/index.js",
+    "smoke": "bash scripts/smoke.sh",
     "package:smoke": "node scripts/pack-smoke.mjs",
-    "release:check": "npm test && npm run check && npm run package:smoke"
+    "release:check": "npm test && npm run check && npm run smoke && npm run package:smoke"
   },
   "keywords": [
     "agents",
