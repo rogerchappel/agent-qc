@@ -97,6 +97,22 @@ Use JSON output for automation:
 echo 'gh pr create --body "test\\nbody"' | agent-qc command-scan --json
 ```
 
+## Runnable demo
+
+The repository includes a local demo for the PR body guard:
+
+```sh
+bash examples/pr-body-guard-demo.sh
+```
+
+It creates temporary Markdown bodies, proves that literal `\n` bodies fail,
+checks the passing `--body-file` path, and does not call GitHub.
+
+## Promotion notes
+
+- [Video brief](docs/promo/video-brief.md)
+- [Social hooks](docs/promo/social-hooks.md)
+
 ## Current gates
 
 - `ready` provides a single local handoff command for agents.
