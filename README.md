@@ -126,6 +126,15 @@ checks the passing `--body-file` path, and does not call GitHub.
 - Fails `gh pr create` or `gh pr edit` commands using unsafe `--body` with escaped newlines.
 - Recommends `--body-file` when unsafe patterns are detected.
 
+## Limitations
+
+- `agent-qc` only inspects local repository state and local files. Fetch the base
+  branch yourself before relying on freshness-sensitive branch checks.
+- GitHub PR body checks require `gh` authentication and read the existing PR
+  body; they do not create, edit, merge, or close pull requests.
+- Command scanning is a deterministic guard for known risky patterns. It is not
+  a shell parser or a substitute for reviewing the command before execution.
+
 ## Next gates
 
 - CrewCmd task, branch, and PR metadata checks.
