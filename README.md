@@ -21,7 +21,7 @@ After publication, install the CLI with npm:
 npm install -g agent-qc
 ```
 
-## Use
+## Usage
 
 Run the one-command local handoff gate:
 
