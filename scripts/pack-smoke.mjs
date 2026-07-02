@@ -5,6 +5,11 @@ import { readFile } from "node:fs/promises";
 
 const expectedFiles = [
   "src/index.js",
+  "docs/promo/video-brief.md",
+  "docs/promo/social-hooks.md",
+  "examples/pr-body-guard-demo.sh",
+  "AGENTS.md",
+  "CODE_OF_CONDUCT.md",
   "README.md",
   "LICENSE",
   "CHANGELOG.md",

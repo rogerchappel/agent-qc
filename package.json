@@ -12,6 +12,10 @@
   },
   "files": [
     "src",
+    "docs",
+    "examples",
+    "AGENTS.md",
+    "CODE_OF_CONDUCT.md",
     "README.md",
     "LICENSE",
     "SECURITY.md",
