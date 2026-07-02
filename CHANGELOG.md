@@ -12,6 +12,8 @@ format and uses semantic versioning when versioned releases are published.
 - Release-candidate package metadata and npm pack assertions.
 - CLI smoke verification for help, version, body validation, and command scanning.
 - README release-check commands that match CI.
+- Branch hygiene, commit reviewability, and `ready` gate documentation now match
+  the shipped CLI and release smoke coverage.
 
 ## Release Links
 
