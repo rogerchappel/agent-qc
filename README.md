@@ -162,7 +162,8 @@ npm run release:check
 safe command scanning, and unsafe inline GitHub body detection.
 
 `npm run package:smoke` asserts that the packed tarball keeps the CLI runtime,
-license, changelog, contributing guide, and security policy expected by users.
+demo script, promo docs, agent guidance, license, changelog, contributing
+guide, code of conduct, and security policy expected by users.
 
 ## License
 
