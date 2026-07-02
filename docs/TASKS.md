@@ -4,6 +4,21 @@ Generated from the 2026-04-29 dogfood session.
 
 Goal: make `agent-qc` a deterministic QC CLI for agentic development workflows, starting with GitHub body formatting and expanding to branch hygiene, commit quality, and PR readiness.
 
+## Current Release Surface
+
+The v0.1 release-candidate CLI now includes the first three taskbrief gates:
+
+- PR body quality: `file-body`, `github-pr-body`, and `command-scan` reject
+  empty bodies, literal escaped newlines, missing review sections, and unsafe
+  inline GitHub CLI `--body` usage.
+- Branch hygiene: `git-branch` checks for a clean named feature branch and a
+  local base ref that is not ahead of the current branch.
+- Commit reviewability: `git-commits` checks bounded commits ahead of the base
+  ref and Conventional Commit style subjects.
+
+Remaining queue items should build on these shipped commands instead of
+reimplementing them.
+
 ```yaml
 version: "0.1"
 source: taskbrief
@@ -11,6 +26,7 @@ workspace: rogerchappel-oss
 tasks:
   - id: agent-qc-pr-body-sections
     title: Enforce required PR body sections
+    status: shipped
     repo: agent-qc
     branch: agent/pr-body-sections
     type: tests
@@ -43,6 +59,7 @@ tasks:
 
   - id: agent-qc-git-branch-hygiene
     title: Add branch hygiene gate
+    status: shipped
     repo: agent-qc
     branch: agent/git-branch-hygiene
     type: qa
@@ -75,6 +92,7 @@ tasks:
 
   - id: agent-qc-commit-atomicity
     title: Add commit atomicity gate
+    status: shipped
     repo: agent-qc
     branch: agent/commit-atomicity-gate
     type: qa
