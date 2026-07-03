@@ -126,6 +126,19 @@ checks the passing `--body-file` path, and does not call GitHub.
 - Fails `gh pr create` or `gh pr edit` commands using unsafe `--body` with escaped newlines.
 - Recommends `--body-file` when unsafe patterns are detected.
 
+
+## Verification
+
+Run the local quality gates before opening a pull request:
+
+```sh
+npm run lint
+npm test
+npm run smoke
+```
+
+`npm run lint` is an alias for the repository static check so contributors can use the common npm workflow without guessing the project-specific command.
+
 ## Limitations
 
 - `agent-qc` only inspects local repository state and local files. Fetch the base
