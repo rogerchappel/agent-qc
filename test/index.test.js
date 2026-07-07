@@ -69,6 +69,24 @@ test('command-scan fails gh pr edit with unsafe --body', () => {
   assert.equal(result.failures[0].code, 'unsafe-github-body');
 });
 
+test('command-scan fails unsafe equals body syntax', () => {
+  const result = scanCommand('gh pr create --title "test" --body="## Summary\\n- Fix bug"');
+  assert.equal(result.ok, false);
+  assert.equal(result.failures[0].code, 'unsafe-github-body');
+});
+
+test('command-scan fails unsafe single-quoted body syntax', () => {
+  const result = scanCommand("gh pr edit 123 --body '## Update\\n- More changes'");
+  assert.equal(result.ok, false);
+  assert.equal(result.failures[0].code, 'unsafe-github-body');
+});
+
+test('command-scan fails literal multiline body syntax', () => {
+  const result = scanCommand('gh pr create --title "test" --body "## Summary\n- Fix bug"');
+  assert.equal(result.ok, false);
+  assert.equal(result.failures[0].code, 'unsafe-github-body');
+});
+
 test('command-scan passes gh pr create with --body-file', () => {
   const result = scanCommand('gh pr create --title "test" --body-file /tmp/pr-body.md');
   assert.equal(result.ok, true);

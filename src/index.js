@@ -298,10 +298,10 @@ export function scanCommand(input) {
   const suggestions = [];
 
   if (input.includes('gh pr create') || input.includes('gh pr edit')) {
-    const hasUnsafeBody = input.includes('--body "') && input.includes('\\n');
-    const hasMultilineString = /--body\s+["']((?:[^"']|\n)+)["']/.test(input) && (input.match(/--body/g) || []).length > 0;
+    const inlineBodies = [...input.matchAll(/(?:^|\s)--body(?:=|\s+)(["'])([\s\S]*?)\1/g)].map((match) => match[2]);
+    const hasUnsafeBody = inlineBodies.some((body) => body.includes('\\n') || body.includes('\n'));
 
-    if (hasUnsafeBody || hasMultilineString) {
+    if (hasUnsafeBody) {
       result.failures.push({
         code: 'unsafe-github-body',
         message: 'GitHub command uses --body with multiline content or escaped newlines.',
