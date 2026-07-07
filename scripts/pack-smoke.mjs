@@ -40,4 +40,16 @@ if (packageJson.bin?.["agent-qc"] !== "src/index.js") {
   process.exit(1);
 }
 
+const cliFile = pack.files.find((file) => file.path === packageJson.bin["agent-qc"]);
+if (!cliFile || (cliFile.mode & 0o111) === 0) {
+  console.error("agent-qc package smoke failed; packed CLI is not executable.");
+  process.exit(1);
+}
+
+const cliSource = await readFile(packageJson.bin["agent-qc"], "utf8");
+if (!cliSource.startsWith("#!/usr/bin/env node")) {
+  console.error("agent-qc package smoke failed; CLI is missing the node shebang.");
+  process.exit(1);
+}
+
 console.log(`agent-qc package smoke passed with ${pack.files.length} packed file(s).`);
