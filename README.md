@@ -158,10 +158,14 @@ npm run smoke
 Run the same release-readiness validation used by CI:
 
 ```sh
+npm run release:readiness
 bash scripts/validate.sh
 ```
 
-The validation script runs the package release check and only runs `agent-qc ready` when the current branch has commits ahead of `origin/main`.
+`npm run release:readiness` validates package metadata, CLI bin metadata, npm
+allowlist coverage, required support docs, and CI presence. The validation
+script runs the package release check and only runs `agent-qc ready` when the
+current branch has commits ahead of `origin/main`.
 
 ```sh
 npm test
