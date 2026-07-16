@@ -93,6 +93,25 @@ test('command-scan passes gh pr create with --body-file', () => {
   assert.deepEqual(result.failures, []);
 });
 
+test('file-body CLI validates shipped PR body fixtures', () => {
+  const cwd = new URL('..', import.meta.url).pathname;
+  const reviewable = spawnSync(process.execPath, ['src/index.js', 'file-body', '--path', 'fixtures/pr-bodies/reviewable.md', '--json'], {
+    encoding: 'utf8',
+    cwd,
+  });
+  assert.equal(reviewable.status, 0);
+  assert.equal(JSON.parse(reviewable.stdout).ok, true);
+
+  const escaped = spawnSync(process.execPath, ['src/index.js', 'file-body', '--path', 'fixtures/pr-bodies/escaped-newlines.md', '--json'], {
+    encoding: 'utf8',
+    cwd,
+  });
+  assert.equal(escaped.status, 1);
+  const parsed = JSON.parse(escaped.stdout);
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.failures[0].code, 'literal-escaped-newlines');
+});
+
 test('command-scan via stdin', () => {
   const tmpFile = join(tmpdir(), `test-stdin-${Date.now()}.md`);
   writeFileSync(tmpFile, 'gh pr create --body "test\\nbody"');

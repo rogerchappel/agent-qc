@@ -23,6 +23,7 @@ for (const file of [
   'src',
   'docs',
   'examples',
+  'fixtures',
   'AGENTS.md',
   'CODE_OF_CONDUCT.md',
   'README.md',
