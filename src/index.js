@@ -297,8 +297,9 @@ export function scanCommand(input) {
   const result = createResult();
   const suggestions = [];
 
-  if (input.includes('gh pr create') || input.includes('gh pr edit')) {
-    const inlineBodies = [...input.matchAll(/(?:^|\s)--body(?:=|\s+)(["'])([\s\S]*?)\1/g)].map((match) => match[2]);
+  if (/\bgh\s+pr\s+(?:create|edit)\b/.test(input)) {
+    const inlineBodies = [...input.matchAll(/(?:^|\s)--body(?:\s*=\s*|\s+)(?:\$)?(["'])((?:\\[\s\S]|(?!\1)[\s\S])*)\1/g)]
+      .map((match) => match[2]);
     const hasUnsafeBody = inlineBodies.some((body) => body.includes('\\n') || body.includes('\n'));
 
     if (hasUnsafeBody) {

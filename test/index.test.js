@@ -87,6 +87,20 @@ test('command-scan fails literal multiline body syntax', () => {
   assert.equal(result.failures[0].code, 'unsafe-github-body');
 });
 
+test('command-scan fails gh pr create separated by ordinary shell whitespace', () => {
+  const result = scanCommand('gh   pr\tcreate --body "## Summary\\n- Fix bug"');
+  assert.equal(result.ok, false);
+  assert.equal(result.failures[0].code, 'unsafe-github-body');
+  assert.ok(result.suggestions.includes('--body-file'));
+});
+
+test('command-scan fails ANSI-C-quoted body with escaped newlines', () => {
+  const result = scanCommand("gh pr edit 123 --body $'## Update\\n- More changes'");
+  assert.equal(result.ok, false);
+  assert.equal(result.failures[0].code, 'unsafe-github-body');
+  assert.ok(result.suggestions.includes('--body-file'));
+});
+
 test('command-scan passes gh pr create with --body-file', () => {
   const result = scanCommand('gh pr create --title "test" --body-file /tmp/pr-body.md');
   assert.equal(result.ok, true);
