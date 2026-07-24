@@ -234,6 +234,12 @@ export function checkGitCommits({ repo = process.cwd(), base = 'origin/main', ma
       message: `${base} cannot be resolved locally.`,
       fix: `Fetch or choose a valid base branch, then rerun agent-qc git-commits --base ${base}.`,
     });
+    result.checks.push({
+      name: 'git-commits',
+      status: 'fail',
+      message: `Cannot review commits because ${base} is unavailable locally.`,
+      subjects: [],
+    });
     result.ok = false;
     return result;
   }
@@ -322,9 +328,7 @@ export function runReady({ cwd = process.cwd(), base = 'origin/main', maxCount =
   const result = createResult();
 
   mergeResult(result, checkGitBranch({ repo: cwd, base }));
-  if (gitOk(cwd, ['rev-parse', '--verify', '--quiet', base])) {
-    mergeResult(result, checkGitCommits({ repo: cwd, base, maxCount }));
-  }
+  mergeResult(result, checkGitCommits({ repo: cwd, base, maxCount }));
 
   try {
     const output = execFileSync('atomcommit', ['--json'], {

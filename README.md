@@ -41,7 +41,7 @@ Use JSON output for automation:
 agent-qc ready --json
 ```
 
-`ready` runs the local deterministic readiness checks built into `agent-qc`: branch hygiene, commit reviewability, and optional `atomcommit --json` when `atomcommit` is installed on `PATH`. Missing `atomcommit` is a warning for now, not a hard failure. Git checks use local refs only; run `git fetch origin main` yourself first if you want the freshest base ref.
+`ready` runs the local deterministic readiness checks built into `agent-qc`: branch hygiene, commit reviewability, and optional `atomcommit --json` when `atomcommit` is installed on `PATH`. Missing `atomcommit` is a warning for now, not a hard failure. Git checks use local refs only and never fetch: if the requested base ref is unavailable, branch hygiene warns and commit reviewability fails the readiness gate. Run `git fetch origin main` yourself first to provide or refresh the base ref.
 
 Check the current branch is a clean, named feature branch and is not behind the local base ref:
 
