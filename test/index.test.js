@@ -249,6 +249,56 @@ test('ready warns when atomcommit is missing', () => {
   }
 });
 
+test('ready fails with an explicit git-commits check when the base is unavailable', () => {
+  const repo = tmpRepo();
+  const noAtomcommitPath = '/opt/homebrew/bin:/usr/bin:/bin';
+  try {
+    execFileSync('git', ['branch', '-D', 'origin/main'], { cwd: repo, stdio: 'ignore' });
+    execFileSync('git', ['checkout', '-b', 'feat/missing-base'], { cwd: repo, stdio: 'ignore' });
+    writeFileSync(join(repo, 'invalid.txt'), 'invalid\n');
+    execFileSync('git', ['add', 'invalid.txt'], { cwd: repo });
+    execFileSync('git', ['commit', '-m', 'not conventional'], { cwd: repo, stdio: 'ignore' });
+
+    const result = spawnSync(process.execPath, ['src/index.js', 'ready', '--repo', repo, '--base', 'origin/main', '--json'], {
+      cwd: new URL('..', import.meta.url).pathname,
+      encoding: 'utf8',
+      env: { ...process.env, PATH: noAtomcommitPath },
+    });
+
+    assert.equal(result.status, 1);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.ok, false);
+    assert.ok(parsed.failures.some((failure) => failure.code === 'base-ref-unavailable'));
+    assert.deepEqual(
+      parsed.checks.find((check) => check.name === 'git-commits'),
+      {
+        name: 'git-commits',
+        status: 'fail',
+        message: 'Cannot review commits because origin/main is unavailable locally.',
+        subjects: [],
+      },
+    );
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('ready fails commit reviewability when the base is unavailable with zero feature commits', () => {
+  const repo = tmpRepo();
+  try {
+    execFileSync('git', ['branch', '-D', 'origin/main'], { cwd: repo, stdio: 'ignore' });
+    execFileSync('git', ['checkout', '-b', 'feat/missing-base'], { cwd: repo, stdio: 'ignore' });
+
+    const result = runReady({ cwd: repo, base: 'origin/main' });
+
+    assert.equal(result.ok, false);
+    assert.ok(result.failures.some((failure) => failure.code === 'base-ref-unavailable'));
+    assert.equal(result.checks.find((check) => check.name === 'git-commits')?.status, 'fail');
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
 test('ready passes through atomcommit summary when available', () => {
   const repo = tmpRepo();
   const binDir = mkdtempSync(join(tmpdir(), 'agent-qc-bin-'));
