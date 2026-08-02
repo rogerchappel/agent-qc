@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkGitBranch, checkGitCommits, isConventionalCommit, validateGithubBody, scanCommand, run, runReady } from '../src/index.js';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, unlinkSync, chmodSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, unlinkSync, chmodSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 function tmpRepo() {
   const repo = mkdtempSync(join(tmpdir(), 'agent-qc-repo-'));
@@ -154,6 +154,22 @@ test('prints package version', () => {
 
   assert.equal(result.status, 0);
   assert.equal(result.stdout.trim(), '0.1.0');
+});
+
+test('runs the CLI through a filesystem symlink', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'agent-qc-bin-'));
+  const cli = join(directory, 'agent-qc');
+  symlinkSync(resolve('src/index.js'), cli);
+
+  const help = spawnSync(process.execPath, [cli, '--help'], { encoding: 'utf8' });
+  assert.equal(help.status, 0);
+  assert.match(help.stdout, /Usage:\n  agent-qc --version/);
+  assert.equal(help.stderr, '');
+
+  const version = spawnSync(process.execPath, [cli, '--version'], { encoding: 'utf8' });
+  assert.equal(version.status, 0);
+  assert.equal(version.stdout, '0.1.0\n');
+  assert.equal(version.stderr, '');
 });
 
 test('command-scan json output', () => {
