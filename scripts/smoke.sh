@@ -5,8 +5,10 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/agent-qc-smoke.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-node "$repo_root/src/index.js" --help | grep -q 'agent-qc'
-test "$(node "$repo_root/src/index.js" --version)" = "0.1.0"
+cli="$tmp_dir/agent-qc"
+ln -s "$repo_root/src/index.js" "$cli"
+node "$cli" --help | grep -q 'agent-qc'
+test "$(node "$cli" --version)" = "0.1.0"
 
 cat > "$tmp_dir/pr-body.md" <<'BODY'
 ## Summary
