@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkGitBranch, checkGitCommits, isConventionalCommit, validateGithubBody, scanCommand, run, runReady } from '../src/index.js';
+import { checkGitBranch, checkGitCommits, isConventionalCommit, parseMaxCount, validateGithubBody, scanCommand, run, runReady } from '../src/index.js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, unlinkSync, chmodSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -183,6 +183,17 @@ test('validates Conventional Commit subjects', () => {
   assert.equal(isConventionalCommit('update docs'), false);
 });
 
+test('parses positive integer max-count values', () => {
+  assert.equal(parseMaxCount('1'), 1);
+  assert.equal(parseMaxCount(5), 5);
+});
+
+test('rejects invalid max-count values', () => {
+  for (const value of ['nope', '1.5', '0', '-1']) {
+    assert.throws(() => parseMaxCount(value), /--max-count must be a positive integer/);
+  }
+});
+
 test('git-branch passes on clean feature branch', () => {
   const repo = tmpRepo();
   try {
@@ -217,6 +228,47 @@ test('git-commits passes scoped Conventional Commit branch', () => {
     const result = checkGitCommits({ repo, base: 'origin/main', maxCount: 5 });
     assert.equal(result.ok, true);
     assert.equal(result.checks[0].message, '1 commit(s) ahead of origin/main');
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('git-commits enforces a positive max-count at the CLI boundary', () => {
+  const cwd = new URL('..', import.meta.url).pathname;
+  for (const command of ['git-commits', 'ready']) {
+    for (const value of ['nope', '1.5', '0', '-1']) {
+      const result = spawnSync(process.execPath, ['src/index.js', command, '--max-count', value, '--json'], {
+        cwd,
+        encoding: 'utf8',
+      });
+
+      assert.equal(result.status, 1, `${command} should reject ${value}`);
+      const parsed = JSON.parse(result.stdout);
+      assert.equal(parsed.ok, false);
+      assert.equal(parsed.failures[0].code, 'argument-error');
+      assert.equal(parsed.failures[0].message, '--max-count must be a positive integer');
+    }
+  }
+});
+
+test('git-commits retains bounded-count behavior for a valid max-count', () => {
+  const repo = tmpRepo();
+  try {
+    execFileSync('git', ['checkout', '-b', 'feat/commit-limit'], { cwd: repo, stdio: 'ignore' });
+    for (const name of ['one', 'two']) {
+      writeFileSync(join(repo, `${name}.txt`), `${name}\n`);
+      execFileSync('git', ['add', `${name}.txt`], { cwd: repo });
+      execFileSync('git', ['commit', '-m', `feat: add ${name}`], { cwd: repo, stdio: 'ignore' });
+    }
+
+    const result = spawnSync(process.execPath, ['src/index.js', 'git-commits', '--repo', repo, '--max-count', '1', '--json'], {
+      cwd: new URL('..', import.meta.url).pathname,
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 1);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.failures.find((failure) => failure.code === 'too-many-commits')?.message,
+      'Branch has 2 commits ahead of origin/main; maximum is 1.');
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
