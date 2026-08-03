@@ -227,8 +227,28 @@ export function isConventionalCommit(subject) {
     || /^Revert ".+"/.test(subject);
 }
 
+function invalidMaxCount() {
+  const error = new Error('--max-count must be a positive integer');
+  error.code = 'argument-error';
+  return error;
+}
+
+export function parseMaxCount(value) {
+  const text = String(value);
+  if (!/^[1-9]\d*$/.test(text)) {
+    throw invalidMaxCount();
+  }
+
+  const parsed = Number(text);
+  if (!Number.isSafeInteger(parsed)) {
+    throw invalidMaxCount();
+  }
+  return parsed;
+}
+
 export function checkGitCommits({ repo = process.cwd(), base = 'origin/main', maxCount = 5 } = {}) {
   const result = createResult();
+  const validatedMaxCount = parseMaxCount(maxCount);
   if (!gitOk(repo, ['rev-parse', '--verify', '--quiet', base])) {
     result.failures.push({
       code: 'base-ref-unavailable',
@@ -257,10 +277,10 @@ export function checkGitCommits({ repo = process.cwd(), base = 'origin/main', ma
     });
   }
 
-  if (subjects.length > Number(maxCount)) {
+  if (subjects.length > validatedMaxCount) {
     result.failures.push({
       code: 'too-many-commits',
-      message: `Branch has ${subjects.length} commits ahead of ${base}; maximum is ${maxCount}.`,
+      message: `Branch has ${subjects.length} commits ahead of ${base}; maximum is ${validatedMaxCount}.`,
       fix: 'Split into smaller PRs or squash fixup commits before requesting review.',
     });
   }
@@ -376,7 +396,7 @@ export function runReady({ cwd = process.cwd(), base = 'origin/main', maxCount =
 }
 
 function usage() {
-  return `agent-qc\n\nUsage:\n  agent-qc --version\n  agent-qc ready [--repo .] [--base origin/main] [--max-count 5] [--json]\n  agent-qc git-branch [--repo .] [--base origin/main] [--json]\n  agent-qc git-commits [--repo .] [--base origin/main] [--max-count 5] [--json]\n  agent-qc github-pr-body --repo owner/name --pr 123 [--json]\n  agent-qc file-body --path /tmp/body.md [--json]\n  agent-qc command-scan [--command "cmd"] [--json]\n\nQuality gates:\n  ready           Run the local readiness gate. Does not fetch or mutate git state.\n  git-branch      Check branch name, cleanliness, and behind-base state using local git refs.\n  git-commits     Check commits ahead of a base ref for count and Conventional Commit subjects.\n  github-pr-body  Fetch a PR body with gh and fail on non-reviewable markdown issues.\n  file-body       Validate a local markdown body before posting it to GitHub.\n  command-scan    Scan a planned shell command (from stdin or --command) for unsafe patterns.\n                  Does NOT execute the command.\n`;
+  return `agent-qc\n\nUsage:\n  agent-qc --version\n  agent-qc ready [--repo .] [--base origin/main] [--max-count 5] [--json]\n  agent-qc git-branch [--repo .] [--base origin/main] [--json]\n  agent-qc git-commits [--repo .] [--base origin/main] [--max-count 5] [--json]\n  agent-qc github-pr-body --repo owner/name --pr 123 [--json]\n  agent-qc file-body --path /tmp/body.md [--json]\n  agent-qc command-scan [--command "cmd"] [--json]\n\nOptions:\n  --max-count N   Require at most N commits, where N is a positive integer.\n\nQuality gates:\n  ready           Run the local readiness gate. Does not fetch or mutate git state.\n  git-branch      Check branch name, cleanliness, and behind-base state using local git refs.\n  git-commits     Check commits ahead of a base ref for count and Conventional Commit subjects.\n  github-pr-body  Fetch a PR body with gh and fail on non-reviewable markdown issues.\n  file-body       Validate a local markdown body before posting it to GitHub.\n  command-scan    Scan a planned shell command (from stdin or --command) for unsafe patterns.\n                  Does NOT execute the command.\n`;
 }
 
 export function run(argv = process.argv.slice(2)) {
@@ -394,7 +414,7 @@ export function run(argv = process.argv.slice(2)) {
     }
 
     if (command === 'ready') {
-      const result = runReady({ cwd: flags.repo || process.cwd(), base: flags.base || 'origin/main', maxCount: flags['max-count'] || 5 });
+      const result = runReady({ cwd: flags.repo || process.cwd(), base: flags.base || 'origin/main', maxCount: flags['max-count'] ?? 5 });
       printResult(result, Boolean(flags.json));
       return result.ok ? 0 : 1;
     }
@@ -406,7 +426,7 @@ export function run(argv = process.argv.slice(2)) {
     }
 
     if (command === 'git-commits') {
-      const result = checkGitCommits({ repo: flags.repo || process.cwd(), base: flags.base || 'origin/main', maxCount: flags['max-count'] || 5 });
+      const result = checkGitCommits({ repo: flags.repo || process.cwd(), base: flags.base || 'origin/main', maxCount: flags['max-count'] ?? 5 });
       printResult(result, Boolean(flags.json));
       return result.ok ? 0 : 1;
     }
@@ -459,7 +479,7 @@ export function run(argv = process.argv.slice(2)) {
       ok: false,
       failures: [
         {
-          code: 'runtime-error',
+          code: error instanceof Error && error.code === 'argument-error' ? 'argument-error' : 'runtime-error',
           message: error instanceof Error ? error.message : String(error),
           fix: 'Check command arguments and local tooling, then rerun agent-qc.',
         },

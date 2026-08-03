@@ -55,6 +55,8 @@ Check commits ahead of the base ref for Conventional Commit subjects and a bound
 agent-qc git-commits --repo . --base origin/main --max-count 5
 ```
 
+For `git-commits` and `ready`, `--max-count` accepts positive integers only.
+
 Validate a local body before posting to GitHub. In this repository, body validation requires the pull request template sections: Summary, Verification, Risk Level, and Rollback Plan.
 
 ```sh
