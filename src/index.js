@@ -77,25 +77,53 @@ export function validateGithubBody(body, { requiredSections = ['Summary', 'Verif
   return result;
 }
 
+const commandOptions = {
+  ready: { values: ['repo', 'base', 'max-count'], booleans: ['json'] },
+  'git-branch': { values: ['repo', 'base'], booleans: ['json'] },
+  'git-commits': { values: ['repo', 'base', 'max-count'], booleans: ['json'] },
+  'github-pr-body': { values: ['repo', 'pr'], booleans: ['json'] },
+  'file-body': { values: ['path'], booleans: ['json'] },
+  'command-scan': { values: ['command'], booleans: ['json'] },
+};
+
+function argumentError(message) {
+  const error = new Error(message);
+  error.code = 'argument-error';
+  return error;
+}
+
 function parseArgs(argv) {
   const [command, ...rest] = argv;
   const flags = {};
   const positional = [];
+  const schema = commandOptions[command];
+
+  if (!schema) return { command, flags, positional: rest };
 
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index];
     if (arg.startsWith('--')) {
       const key = arg.slice(2);
+      if (schema.booleans.includes(key)) {
+        flags[key] = true;
+        continue;
+      }
+      if (!schema.values.includes(key)) {
+        throw argumentError(`Unknown option for ${command}: --${key}`);
+      }
       const next = rest[index + 1];
       if (!next || next.startsWith('--')) {
-        flags[key] = true;
-      } else {
-        flags[key] = next;
-        index += 1;
+        throw argumentError(`Option --${key} requires a value`);
       }
+      flags[key] = next;
+      index += 1;
     } else {
       positional.push(arg);
     }
+  }
+
+  if (positional.length > 0) {
+    throw argumentError(`Unexpected positional argument for ${command}: ${positional[0]}`);
   }
 
   return { command, flags, positional };
@@ -400,9 +428,13 @@ function usage() {
 }
 
 export function run(argv = process.argv.slice(2)) {
-  const { command, flags } = parseArgs(argv);
+  let flags = {};
 
   try {
+    const parsed = parseArgs(argv);
+    const { command } = parsed;
+    flags = parsed.flags;
+
     if (!command || command === 'help' || command === '--help' || command === '-h') {
       process.stdout.write(usage());
       return 0;
@@ -485,8 +517,8 @@ export function run(argv = process.argv.slice(2)) {
         },
       ],
     };
-    printResult(result, Boolean(flags.json));
-    return 1;
+    printResult(result, Boolean(flags.json || argv.includes('--json')));
+    return error instanceof Error && error.code === 'argument-error' ? 2 : 1;
   }
 }
 
