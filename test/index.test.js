@@ -177,6 +177,69 @@ test('command-scan json output', () => {
   assert.equal(result, 1);
 });
 
+test('rejects unknown command-specific options in text and JSON modes', () => {
+  const cwd = new URL('..', import.meta.url).pathname;
+  for (const extra of [[], ['--json']]) {
+    const result = spawnSync(process.execPath, ['src/index.js', 'command-scan', '--bogus', 'value', ...extra], {
+      cwd,
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 2);
+    const output = extra.length ? JSON.parse(result.stdout) : null;
+    assert.equal(output?.failures[0].code ?? (result.stderr.includes('argument-error') && 'argument-error'), 'argument-error');
+  }
+});
+
+test('rejects missing values for every value-taking option', () => {
+  const cwd = new URL('..', import.meta.url).pathname;
+  const cases = [
+    ['ready', '--repo'],
+    ['git-branch', '--base'],
+    ['git-commits', '--max-count'],
+    ['github-pr-body', '--pr'],
+    ['file-body', '--path'],
+    ['command-scan', '--command'],
+  ];
+  for (const args of cases) {
+    const result = spawnSync(process.execPath, ['src/index.js', ...args, '--json'], { cwd, encoding: 'utf8' });
+    assert.equal(result.status, 2, args.join(' '));
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.failures[0].code, 'argument-error');
+    assert.match(parsed.failures[0].message, /requires a value/);
+  }
+});
+
+test('rejects unexpected positional arguments for every command class', () => {
+  const cwd = new URL('..', import.meta.url).pathname;
+  for (const command of ['ready', 'git-branch', 'git-commits', 'github-pr-body', 'file-body', 'command-scan']) {
+    const result = spawnSync(process.execPath, ['src/index.js', command, 'unexpected', '--json'], { cwd, encoding: 'utf8' });
+    assert.equal(result.status, 2, command);
+    assert.equal(JSON.parse(result.stdout).failures[0].code, 'argument-error');
+  }
+});
+
+test('keeps JSON, help, and version switches boolean', () => {
+  const cwd = new URL('..', import.meta.url).pathname;
+  const json = spawnSync(process.execPath, ['src/index.js', 'command-scan', '--json'], {
+    cwd,
+    encoding: 'utf8',
+    input: 'git status',
+  });
+  assert.equal(json.status, 0);
+  assert.equal(JSON.parse(json.stdout).ok, true);
+
+  for (const option of ['--help', '-h']) {
+    const help = spawnSync(process.execPath, ['src/index.js', option], { cwd, encoding: 'utf8' });
+    assert.equal(help.status, 0);
+    assert.match(help.stdout, /Usage:/);
+  }
+  for (const option of ['--version', '-v']) {
+    const version = spawnSync(process.execPath, ['src/index.js', option], { cwd, encoding: 'utf8' });
+    assert.equal(version.status, 0);
+    assert.equal(version.stdout, '0.1.0\n');
+  }
+});
+
 test('validates Conventional Commit subjects', () => {
   assert.equal(isConventionalCommit('feat(git): add branch hygiene gate'), true);
   assert.equal(isConventionalCommit('fix: repair parser'), true);
@@ -242,7 +305,7 @@ test('git-commits enforces a positive max-count at the CLI boundary', () => {
         encoding: 'utf8',
       });
 
-      assert.equal(result.status, 1, `${command} should reject ${value}`);
+      assert.equal(result.status, 2, `${command} should reject ${value}`);
       const parsed = JSON.parse(result.stdout);
       assert.equal(parsed.ok, false);
       assert.equal(parsed.failures[0].code, 'argument-error');
