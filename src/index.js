@@ -353,8 +353,8 @@ export function scanCommand(input) {
   const suggestions = [];
 
   if (/\bgh\s+pr\s+(?:create|edit)\b/.test(input)) {
-    const inlineBodies = [...input.matchAll(/(?:^|\s)--body(?:\s*=\s*|\s+)(?:\$)?(["'])((?:\\[\s\S]|(?!\1)[\s\S])*)\1/g)]
-      .map((match) => match[2]);
+    const inlineBodies = [...input.matchAll(/(?:^|\s)--body(?:\s*=\s*|\s+)(?:(?:\$)?(["'])((?:\\[\s\S]|(?!\1)[\s\S])*)\1|([^\s]+))/g)]
+      .map((match) => match[2] ?? match[3]);
     const hasUnsafeBody = inlineBodies.some((body) => body.includes('\\n') || body.includes('\n'));
 
     if (hasUnsafeBody) {

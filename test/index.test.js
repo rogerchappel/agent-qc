@@ -101,6 +101,32 @@ test('command-scan fails ANSI-C-quoted body with escaped newlines', () => {
   assert.ok(result.suggestions.includes('--body-file'));
 });
 
+test('command-scan fails unquoted spaced and equals body values with escaped newlines', () => {
+  for (const command of [
+    'gh pr create --body Summary\\nDetails',
+    'gh pr create --body=Summary\\nDetails',
+    'gh pr edit 123 --body Update\\nDetails',
+    'gh pr edit 123 --body=Update\\nDetails',
+  ]) {
+    const result = scanCommand(command);
+    assert.equal(result.ok, false, command);
+    assert.equal(result.failures[0].code, 'unsafe-github-body', command);
+    assert.ok(result.suggestions.includes('--body-file'), command);
+  }
+});
+
+test('command-scan ignores escaped newlines outside an inline body value', () => {
+  for (const command of [
+    'gh pr create --title Summary\\nDetails --body safe',
+    'gh pr edit 123 --body safe --label=release\\nnotes',
+    'gh pr create --body-file notes\\nbody.md',
+  ]) {
+    const result = scanCommand(command);
+    assert.equal(result.ok, true, command);
+    assert.deepEqual(result.failures, [], command);
+  }
+});
+
 test('command-scan passes gh pr create with --body-file', () => {
   const result = scanCommand('gh pr create --title "test" --body-file /tmp/pr-body.md');
   assert.equal(result.ok, true);
@@ -175,6 +201,27 @@ test('runs the CLI through a filesystem symlink', () => {
 test('command-scan json output', () => {
   const result = run(['command-scan', '--command', 'gh pr create --body "a\\nb"', '--json']);
   assert.equal(result, 1);
+});
+
+test('command-scan reports unquoted unsafe bodies in text and JSON modes', () => {
+  const cwd = new URL('..', import.meta.url).pathname;
+  const cases = [
+    { args: ['command-scan', '--command', 'gh pr create --body=Summary\\nDetails'], stream: 'stderr' },
+    { args: ['command-scan', '--command', 'gh pr edit 123 --body Update\\nDetails', '--json'], stream: 'stdout' },
+  ];
+
+  for (const { args, stream } of cases) {
+    const result = spawnSync(process.execPath, ['src/index.js', ...args], { cwd, encoding: 'utf8' });
+    assert.equal(result.status, 1, args.join(' '));
+    if (stream === 'stdout') {
+      const parsed = JSON.parse(result.stdout);
+      assert.equal(parsed.ok, false);
+      assert.equal(parsed.failures[0].code, 'unsafe-github-body');
+    } else {
+      assert.match(result.stderr, /agent-qc command-scan fail/);
+      assert.match(result.stderr, /unsafe-github-body/);
+    }
+  }
 });
 
 test('rejects unknown command-specific options in text and JSON modes', () => {
