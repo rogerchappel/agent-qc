@@ -97,8 +97,12 @@ agent-qc command-scan --command 'ls -la'
 Use JSON output for automation:
 
 ```sh
-echo 'gh pr create --body "test\\nbody"' | agent-qc command-scan --json
+echo 'gh pr create --body=test\\nbody' | agent-qc command-scan --json
 ```
+
+Both `--body value` and `--body=value` are checked, whether the inline value is
+quoted or unquoted. Escaped newlines in other arguments do not trigger this
+guard, and `--body-file` remains the supported way to pass multiline Markdown.
 
 ## Runnable demo
 
