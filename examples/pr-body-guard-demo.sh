@@ -17,6 +17,12 @@ cat >"$TMP_DIR/reviewable-body.md" <<'BODY'
 
 ## Verification
 - agent-qc file-body accepts this markdown body.
+
+## Risk Level
+- Low; this demo only creates files in a temporary directory.
+
+## Rollback Plan
+- Revert the demo update.
 BODY
 
 echo "== unsafe body should fail =="
