@@ -15,7 +15,7 @@ requireField('homepage', pkg.homepage);
 requireField('license', pkg.license);
 requireField('bin.agent-qc', pkg.bin?.['agent-qc']);
 
-for (const script of ['check', 'test', 'smoke', 'package:smoke', 'release:check']) {
+for (const script of ['check', 'test', 'smoke', 'demo:pr-body-guard', 'package:smoke', 'release:check']) {
   requireField(`scripts.${script}`, pkg.scripts?.[script]);
 }
 

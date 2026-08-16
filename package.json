@@ -32,9 +32,10 @@
     "lint": "node --check src/index.js",
     "test": "node --test",
     "smoke": "bash scripts/smoke.sh",
+    "demo:pr-body-guard": "bash examples/pr-body-guard-demo.sh",
     "package:smoke": "node scripts/pack-smoke.mjs",
     "release:readiness": "node scripts/validate-release-readiness.mjs",
-    "release:check": "npm run release:readiness && npm test && npm run check && npm run smoke && npm run package:smoke"
+    "release:check": "npm run release:readiness && npm test && npm run check && npm run smoke && npm run demo:pr-body-guard && npm run package:smoke"
   },
   "keywords": [
     "agents",
