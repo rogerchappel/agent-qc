@@ -256,6 +256,43 @@ test('rejects missing values for every value-taking option', () => {
   }
 });
 
+test('rejects duplicate value-taking options before command work in text and JSON modes', () => {
+  const cwd = new URL('..', import.meta.url).pathname;
+  const cases = [
+    ['ready', '--repo', '/definitely/missing', '--repo', '.'],
+    ['git-branch', '--base', '/definitely/missing', '--base', 'origin/main'],
+    ['git-commits', '--max-count', 'not-a-number', '--max-count', '5'],
+    ['github-pr-body', '--pr', 'not-a-number', '--pr', '1'],
+    ['file-body', '--path', '/definitely/missing', '--path', 'fixtures/pr-bodies/reviewable.md'],
+    ['command-scan', '--command', 'first', '--command', 'second'],
+  ];
+
+  for (const args of cases) {
+    for (const json of [false, true]) {
+      const result = spawnSync(process.execPath, ['src/index.js', ...args, ...(json ? ['--json'] : [])], {
+        cwd,
+        encoding: 'utf8',
+      });
+      assert.equal(result.status, 2, `${args.join(' ')} (${json ? 'JSON' : 'text'})`);
+      const output = json ? JSON.parse(result.stdout) : null;
+      const message = output?.failures[0].message ?? result.stderr;
+      assert.match(message, /may only be specified once/);
+      assert.equal(output?.failures[0].code ?? (result.stderr.includes('argument-error') && 'argument-error'), 'argument-error');
+    }
+  }
+});
+
+test('treats duplicate boolean switches as idempotent', () => {
+  const cwd = new URL('..', import.meta.url).pathname;
+  const result = spawnSync(process.execPath, ['src/index.js', 'command-scan', '--json', '--json'], {
+    cwd,
+    encoding: 'utf8',
+    input: 'git status',
+  });
+  assert.equal(result.status, 0);
+  assert.equal(JSON.parse(result.stdout).ok, true);
+});
+
 test('rejects unexpected positional arguments for every command class', () => {
   const cwd = new URL('..', import.meta.url).pathname;
   for (const command of ['ready', 'git-branch', 'git-commits', 'github-pr-body', 'file-body', 'command-scan']) {
