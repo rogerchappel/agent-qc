@@ -97,6 +97,7 @@ function parseArgs(argv) {
   const flags = {};
   const positional = [];
   const schema = commandOptions[command];
+  const seen = new Set();
 
   if (!schema) return { command, flags, positional: rest };
 
@@ -105,12 +106,18 @@ function parseArgs(argv) {
     if (arg.startsWith('--')) {
       const key = arg.slice(2);
       if (schema.booleans.includes(key)) {
+        // Boolean switches are idempotent: repeating one has the same effect as
+        // supplying it once.
         flags[key] = true;
         continue;
       }
       if (!schema.values.includes(key)) {
         throw argumentError(`Unknown option for ${command}: --${key}`);
       }
+      if (seen.has(key)) {
+        throw argumentError(`Option --${key} may only be specified once`);
+      }
+      seen.add(key);
       const next = rest[index + 1];
       if (!next || next.startsWith('--')) {
         throw argumentError(`Option --${key} requires a value`);
