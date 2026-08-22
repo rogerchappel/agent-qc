@@ -56,7 +56,10 @@ agent-qc git-commits --repo . --base origin/main --max-count 5
 ```
 
 For `git-commits` and `ready`, `--max-count` accepts positive integers only.
-Each command rejects unknown options, missing option values, and positional arguments with exit code 2 before running its quality gate.
+Each command rejects unknown options, missing option values, duplicate value-taking
+options, and positional arguments with exit code 2 before running its quality gate or
+reading command input. Repeated boolean switches such as `--json --json` are
+idempotent and behave as if supplied once.
 
 Validate a local body before posting to GitHub. In this repository, body validation requires the pull request template sections: Summary, Verification, Risk Level, and Rollback Plan.
 
