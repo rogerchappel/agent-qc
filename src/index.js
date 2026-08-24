@@ -45,6 +45,30 @@ function templateRequiredSections(cwd = process.cwd()) {
   return [...new Set(sections)];
 }
 
+function githubTemplateRequiredSections(repo) {
+  const defaults = ['Summary', 'Verification'];
+  try {
+    const encoded = execFileSync('gh', [
+      'api',
+      `repos/${repo}/contents/.github/pull_request_template.md`,
+      '--jq',
+      '.content',
+    ], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const template = Buffer.from(encoded.trim(), 'base64').toString('utf8');
+    return [...new Set([
+      ...defaults,
+      ...['Risk Level', 'Rollback Plan'].filter((section) => bodyHasHeading(template, section)),
+    ])];
+  } catch (error) {
+    const stderr = error && typeof error === 'object' ? String(error.stderr ?? '') : '';
+    if (stderr.includes('HTTP 404')) return defaults;
+    throw error;
+  }
+}
+
 export function validateGithubBody(body, { requiredSections = ['Summary', 'Verification'] } = {}) {
   const result = createResult();
 
@@ -472,7 +496,7 @@ export function run(argv = process.argv.slice(2)) {
 
     if (command === 'github-pr-body') {
       const body = githubPrBody({ repo: flags.repo, pr: flags.pr });
-      const result = validateGithubBody(body, { requiredSections: templateRequiredSections(process.cwd()) });
+      const result = validateGithubBody(body, { requiredSections: githubTemplateRequiredSections(flags.repo) });
       printResult(result, Boolean(flags.json));
       return result.ok ? 0 : 1;
     }

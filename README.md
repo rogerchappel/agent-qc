@@ -73,6 +73,12 @@ Validate an existing PR body after creation or edit:
 agent-qc github-pr-body --repo rogerchappel/agent-qc --pr 1
 ```
 
+`github-pr-body` reads the target repository's default-branch pull request template
+through GitHub, so its required sections do not depend on the caller's working
+directory. Repositories without `.github/pull_request_template.md` require the
+default Summary and Verification sections. `file-body` continues to use the pull
+request template in the current checkout.
+
 Machine-readable output:
 
 ```sh
