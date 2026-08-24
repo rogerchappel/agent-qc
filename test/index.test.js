@@ -152,6 +152,33 @@ test('file-body CLI validates shipped PR body fixtures', () => {
   assert.equal(parsed.failures[0].code, 'literal-escaped-newlines');
 });
 
+test('github-pr-body resolves target template requirements outside the checkout', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'agent-qc-gh-'));
+  const gh = join(directory, 'gh');
+  const template = Buffer.from('## Summary\n## Verification\n## Risk Level\n## Rollback Plan\n').toString('base64');
+  writeFileSync(gh, `#!/bin/sh\nif [ "$1" = "pr" ]; then\n  printf '%s\\n' "$AGENT_QC_TEST_BODY"\nelif [ "$1" = "api" ]; then\n  printf '%s\\n' '${template}'\nelse\n  exit 2\nfi\n`);
+  chmodSync(gh, 0o755);
+  const cli = resolve('src/index.js');
+  const env = { ...process.env, PATH: `${directory}:${process.env.PATH}` };
+
+  const incomplete = spawnSync(process.execPath, [cli, 'github-pr-body', '--repo', 'rogerchappel/agent-qc', '--pr', '1', '--json'], {
+    cwd: tmpdir(),
+    encoding: 'utf8',
+    env: { ...env, AGENT_QC_TEST_BODY: '## Summary\nDone\n## Verification\nPassed' },
+  });
+  assert.equal(incomplete.status, 1);
+  assert.match(JSON.parse(incomplete.stdout).failures[0].message, /Risk Level, Rollback Plan/);
+
+  const complete = spawnSync(process.execPath, [cli, 'github-pr-body', '--repo', 'rogerchappel/agent-qc', '--pr', '1', '--json'], {
+    cwd: tmpdir(),
+    encoding: 'utf8',
+    env: { ...env, AGENT_QC_TEST_BODY: '## Summary\nDone\n## Verification\nPassed\n## Risk Level\nLow\n## Rollback Plan\nRevert' },
+  });
+  assert.equal(complete.status, 0);
+  assert.equal(JSON.parse(complete.stdout).ok, true);
+  rmSync(directory, { recursive: true, force: true });
+});
+
 test('command-scan via stdin', () => {
   const tmpFile = join(tmpdir(), `test-stdin-${Date.now()}.md`);
   writeFileSync(tmpFile, 'gh pr create --body "test\\nbody"');
