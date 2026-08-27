@@ -123,7 +123,13 @@ function parseArgs(argv) {
   const schema = commandOptions[command];
   const seen = new Set();
 
-  if (!schema) return { command, flags, positional: rest };
+  if (!schema) {
+    if (['help', '--help', '-h', '--version', '-v', 'version'].includes(command) && rest.length > 0) {
+      throw argumentError(`${command} does not accept additional arguments`);
+    }
+    if (rest.includes('--json')) flags.json = true;
+    return { command, flags, positional: rest.filter((arg) => arg !== '--json') };
+  }
 
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index];
@@ -535,8 +541,7 @@ export function run(argv = process.argv.slice(2)) {
       return result.ok ? 0 : 1;
     }
 
-    process.stderr.write(`Unknown command: ${command}\n\n${usage()}`);
-    return 2;
+    throw argumentError(`Unknown command: ${command}`);
   } catch (error) {
     const result = {
       ok: false,
