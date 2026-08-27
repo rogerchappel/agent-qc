@@ -209,6 +209,31 @@ test('prints package version', () => {
   assert.equal(result.stdout.trim(), '0.1.0');
 });
 
+test('rejects trailing arguments after help and version aliases', () => {
+  const cwd = new URL('..', import.meta.url).pathname;
+  for (const alias of ['help', '--help', '-h', '--version', '-v', 'version']) {
+    for (const trailing of ['unexpected', '--bogus']) {
+      const result = spawnSync(process.execPath, ['src/index.js', alias, trailing], { cwd, encoding: 'utf8' });
+      assert.equal(result.status, 2, `${alias} ${trailing}`);
+      assert.equal(result.stdout, '');
+      assert.match(result.stderr, /argument-error/);
+      assert.match(result.stderr, /does not accept additional arguments/);
+    }
+  }
+});
+
+test('reports unknown commands as structured argument errors when --json is requested', () => {
+  const cwd = new URL('..', import.meta.url).pathname;
+  const result = spawnSync(process.execPath, ['src/index.js', 'bogus', '--json'], { cwd, encoding: 'utf8' });
+
+  assert.equal(result.status, 2);
+  assert.equal(result.stderr, '');
+  const parsed = JSON.parse(result.stdout);
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.failures[0].code, 'argument-error');
+  assert.equal(parsed.failures[0].message, 'Unknown command: bogus');
+});
+
 test('runs the CLI through a filesystem symlink', () => {
   const directory = mkdtempSync(join(tmpdir(), 'agent-qc-bin-'));
   const cli = join(directory, 'agent-qc');
