@@ -35,6 +35,11 @@ Check the installed CLI version:
 agent-qc --version
 ```
 
+Help and version aliases are standalone commands and reject trailing arguments
+or options. CLI argument failures exit with status 2 and write text diagnostics
+to stderr; when `--json` is present, including after an unknown command, they
+write a structured `argument-error` result to stdout instead.
+
 Use JSON output for automation:
 
 ```sh
