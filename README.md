@@ -84,6 +84,15 @@ directory. Repositories without `.github/pull_request_template.md` require the
 default Summary and Verification sections. `file-body` continues to use the pull
 request template in the current checkout.
 
+The GitHub-backed check requires the `gh` CLI to be installed and authenticated
+for the target repository. If `gh` is missing, not authenticated, or the API
+request fails for a reason other than a missing template (for example, a
+permission, network, or rate-limit error), the command reports that error instead
+of treating the template as absent. Install or update `gh`, run `gh auth login`
+with an account that can read the repository, and retry; for transient API
+failures, retry after resolving the network or rate-limit condition. Only an HTTP
+404 for the template falls back to the default Summary and Verification sections.
+
 Machine-readable output:
 
 ```sh
